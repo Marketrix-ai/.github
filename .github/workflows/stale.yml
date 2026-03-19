@@ -1,0 +1,74 @@
+name: Stale Issues
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.INFRA_PAT }}
+    steps:
+      - name: Process stale issues across all repos
+        run: |
+          STALE_DAYS=60
+          CLOSE_DAYS=90
+          EXEMPT_LABELS="P0,cross-cutting"
+          STALE_CUTOFF=$(date -u -d "$STALE_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-${STALE_DAYS}d +%Y-%m-%dT%H:%M:%SZ)
+          CLOSE_CUTOFF=$(date -u -d "$CLOSE_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v-${CLOSE_DAYS}d +%Y-%m-%dT%H:%M:%SZ)
+
+          REPOS=$(gh api /orgs/Marketrix-ai/repos --paginate --jq '.[].full_name')
+
+          for REPO in $REPOS; do
+            echo "=== $REPO ==="
+            PAGE=1
+            while true; do
+              ISSUES=$(gh api "/repos/$REPO/issues?state=open&sort=updated&direction=asc&per_page=100&page=$PAGE" 2>/dev/null)
+              COUNT=$(echo "$ISSUES" | jq length)
+              [ "$COUNT" -eq 0 ] && break
+
+              while read -r ISSUE; do
+                HAS_PR=$(echo "$ISSUE" | jq -r '.pull_request // empty')
+                [ -n "$HAS_PR" ] && continue
+
+                UPDATED=$(echo "$ISSUE" | jq -r '.updated_at')
+                NUM=$(echo "$ISSUE" | jq -r '.number')
+                LABELS=$(echo "$ISSUE" | jq -r '[.labels[].name] | join(",")')
+
+                if [[ "$UPDATED" > "$STALE_CUTOFF" ]]; then
+                  break 2
+                fi
+
+                SKIP=false
+                IFS=',' read -ra EXEMPT_ARR <<< "$EXEMPT_LABELS"
+                for EX in "${EXEMPT_ARR[@]}"; do
+                  if echo ",$LABELS," | grep -q ",$EX,"; then
+                    SKIP=true
+                    break
+                  fi
+                done
+                [ "$SKIP" = true ] && continue
+
+                if [[ "$UPDATED" < "$CLOSE_CUTOFF" ]]; then
+                  if echo ",$LABELS," | grep -q ",stale,"; then
+                    echo "  Closing #$NUM (inactive $CLOSE_DAYS+ days)"
+                    gh issue close "$NUM" --repo "$REPO" --comment "This issue has been automatically closed after $CLOSE_DAYS days of inactivity."
+                  else
+                    echo "  Labeling stale + closing #$NUM"
+                    gh issue edit "$NUM" --repo "$REPO" --add-label stale
+                    gh issue close "$NUM" --repo "$REPO" --comment "This issue has been automatically closed after $CLOSE_DAYS days of inactivity."
+                  fi
+                elif [[ "$UPDATED" < "$STALE_CUTOFF" ]]; then
+                  if ! echo ",$LABELS," | grep -q ",stale,"; then
+                    echo "  Labeling stale #$NUM"
+                    gh issue edit "$NUM" --repo "$REPO" --add-label stale
+                    gh issue comment "$NUM" --repo "$REPO" --body "This issue has been inactive for $STALE_DAYS days. It will be closed in 30 days if there is no further activity."
+                  fi
+                fi
+              done < <(echo "$ISSUES" | jq -c '.[]')
+
+              PAGE=$((PAGE + 1))
+            done
+          done

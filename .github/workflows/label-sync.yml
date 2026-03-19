@@ -1,0 +1,49 @@
+name: Label Sync
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.INFRA_PAT }}
+    steps:
+      - name: Sync labels across all org repos
+        run: |
+          LABELS=(
+            "bug|d73a4a|Something isn't working"
+            "feature|0075ca|New functionality"
+            "enhancement|a2eeef|Improvement to existing functionality"
+            "chore|e4e669|Maintenance, dependencies, CI"
+            "documentation|0e8a16|Documentation changes"
+            "cross-cutting|7057ff|Spans multiple repos"
+            "api|1d76db|Affects api repo"
+            "app|1d76db|Affects app repo"
+            "agent|1d76db|Affects agent repo"
+            "widget|1d76db|Affects widget repo"
+            "infra|1d76db|Affects infra repo"
+            "docs|1d76db|Affects docs repo"
+            "website|1d76db|Affects website repo"
+            "monitor|1d76db|Affects monitor repo"
+            "P0|b60205|Critical"
+            "P1|d93f0b|High"
+            "P2|fbca04|Normal"
+            "stale|ededed|No recent activity"
+          )
+
+          REPOS=$(gh api /orgs/Marketrix-ai/repos --paginate --jq '.[].full_name')
+
+          for REPO in $REPOS; do
+            echo "=== $REPO ==="
+            for ENTRY in "${LABELS[@]}"; do
+              IFS='|' read -r NAME COLOR DESC <<< "$ENTRY"
+              if gh label edit "$NAME" --repo "$REPO" --color "$COLOR" --description "$DESC" 2>/dev/null; then
+                echo "  Updated: $NAME"
+              else
+                gh label create "$NAME" --repo "$REPO" --color "$COLOR" --description "$DESC" 2>/dev/null && echo "  Created: $NAME" || echo "  Exists: $NAME"
+              fi
+            done
+          done
