@@ -1,30 +1,55 @@
 name: Feature Request
-description: Propose a new feature
+description: Propose a new feature (1 repo = routed there, 2+ = cross-cutting with sub-issues)
 labels: ["feature"]
 body:
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: What feature would you like?
+      description: What feature would you like and why?
     validations:
       required: true
   - type: textarea
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: How will we know this is done?
+      description: Testable conditions that define done.
       value: |
         - [ ]
     validations:
       required: true
+  - type: checkboxes
+    id: repos
+    attributes:
+      label: Affected repos
+      description: "1 repo: issue moves there. 2+ repos: stays here as tracking issue, sub-issues auto-created."
+      options:
+        - label: api
+        - label: app
+        - label: agent
+        - label: widget
+        - label: infra
+        - label: docs
+        - label: website
+        - label: monitor
+  - type: textarea
+    id: sub_issues
+    attributes:
+      label: Sub-issues
+      description: Create a sub-issue in each affected repo and link it here.
+      value: |
+        <!-- e.g. Marketrix-ai/api#123 -->
+    validations:
+      required: false
   - type: dropdown
     id: priority
     attributes:
       label: Priority
+      description: Also apply the matching P0/P1/P2 label.
       options:
-        - P0 — Critical
-        - P1 — High
         - P2 — Normal
+        - P1 — High
+        - P0 — Critical
+      default: 0
     validations:
       required: false

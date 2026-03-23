@@ -1,0 +1,71 @@
+name: Issue Router
+
+on:
+  issues:
+    types: [opened]
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.INFRA_PAT }}
+    steps:
+      - name: Route issue based on repo selection
+        run: |
+          ISSUE_NUM="${{ github.event.issue.number }}"
+          TITLE="${{ github.event.issue.title }}"
+          BODY=$(gh api "/repos/${{ github.repository }}/issues/$ISSUE_NUM" --jq '.body // ""')
+          ISSUE_URL="${{ github.event.issue.html_url }}"
+
+          # Extract checked repos from checkboxes
+          REPOS=()
+          for REPO in api app agent widget infra docs website monitor; do
+            if echo "$BODY" | grep -qiP '^\s*-\s*\[x\]\s*'"$REPO"'\s*$'; then
+              REPOS+=("$REPO")
+            fi
+          done
+
+          COUNT=${#REPOS[@]}
+          echo "Checked repos ($COUNT): ${REPOS[*]}"
+
+          if [ "$COUNT" -eq 0 ]; then
+            echo "No repos checked, leaving issue as-is"
+            exit 0
+          fi
+
+          if [ "$COUNT" -eq 1 ]; then
+            TARGET="${REPOS[0]}"
+            echo "Single repo ($TARGET) — moving issue"
+
+            # Create in target repo with feature + repo label
+            NEW_URL=$(gh issue create \
+              --repo "Marketrix-ai/$TARGET" \
+              --title "$TITLE" \
+              --body "$BODY" \
+              --label "feature" --label "$TARGET")
+
+            # Close the .github issue with redirect
+            gh issue close "$ISSUE_NUM" \
+              --repo "${{ github.repository }}" \
+              --comment "Moved to $NEW_URL (single-repo issue belongs in the affected repo)" \
+              --reason "not_planned"
+
+          else
+            echo "Multiple repos ($COUNT) — creating sub-issues"
+
+            COMMENT="Sub-issues created:"
+            for REPO in "${REPOS[@]}"; do
+              SUB_URL=$(gh issue create \
+                --repo "Marketrix-ai/$REPO" \
+                --title "$TITLE" \
+                --body "Part of $ISSUE_URL" \
+                --label "feature" --label "$REPO")
+              COMMENT="$COMMENT
+          - $SUB_URL"
+              echo "  Created in $REPO: $SUB_URL"
+            done
+
+            gh issue comment "$ISSUE_NUM" \
+              --repo "${{ github.repository }}" \
+              --body "$COMMENT"
+          fi
