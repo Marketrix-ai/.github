@@ -1,10 +1,10 @@
 # .github
 
-Org-level GitHub configuration for the Marketrix organization. Provides default templates, shared workflows, and org profile.
+Org-level GitHub configuration for the Marketrix organization. Default issue/PR templates, org-automation workflows, and the public org profile. **Default branch: `main`.** No buildable code here — there is no CI (type-check/lint/build) workflow in this repo.
 
 ## Purpose
 
-This repo is the **cross-cutting issue tracker**. Issues created here automatically get the `cross-cutting` label and represent work spanning multiple repos. Single-repo bugs and features should be filed directly in the affected repo.
+This repo is the **cross-cutting issue tracker**. Issues opened here auto-get the `cross-cutting` label and represent work spanning multiple repos. Single-repo bugs and features go directly in the affected repo (`issue-router` will move a single-repo feature filed here, see below).
 
 ## Development Workflow
 
@@ -17,37 +17,40 @@ The issue body IS the design spec — what to build and why, not how. It must co
 
 ### Automated Flow
 ```
-Issue created in .github
-  → issue-router: 1 repo checked → moves to that repo
-                  2+ repos checked → stays here, sub-issues created in each repo
-  → auto-label applies `cross-cutting`
+Issue opened (here, in .github)
+  → issue-router: counts checked repo boxes (api/app/agent/widget/infra/docs/website/monitor)
+                  1 checked  → creates the issue in that repo (labels: feature + repo),
+                               then closes this one as not_planned with a redirect comment
+                  2+ checked → stays here as tracking issue, creates a sub-issue in EACH repo
+                  0 checked  → left as-is
+  → auto-label applies `cross-cutting` (here only)
   → project-sync → Backlog
 
 Issue assigned
-  → create-branch creates {num}-{slug} branch + draft PR with "Closes #N"
   → project-sync → Ready
+  → create-branch ALSO fires on assign: pushes an empty {num}-{slug} commit/branch
+    and opens a draft PR with "Closes #N" (skipped only for `cross-cutting` issues)
 
-Developer creates worktree, develops, pushes
-  → CI runs on PR branch (type-check + lint + build)
+PR opened (in a service repo)
+  → project-sync (via infra reusable workflow): adds Marketrix-ai/dev as reviewer,
+    moves the `Closes #N` issue → In review; if the PR has no Closes/Fixes/Resolves
+    reference it auto-creates a tracking issue and rewrites the PR body to link it
 
-PR marked ready for review
-  → project-sync moves linked issue → In Review
-
-PR merged
-  → project-sync → Done
-  → GitHub auto-closes the linked issue
-
-PR opened without linked issue
-  → project-sync auto-creates a tracking issue and links it
+PR closed
+  → merged   → project-sync moves linked issue → Done (GitHub also auto-closes via Closes #N)
+  → unmerged → project-sync moves linked issue back → Ready
 ```
 
+> **create-branch caveat.** `create-branch.yml` is still active and fires on every (non-cross-cutting) issue assignment. The canonical workflow (root `CLAUDE.md`) is for the developer to create their own branch + draft PR manually, which leaves create-branch's empty "Closes #N" draft orphaned. Prefer the manual flow and close/ignore the auto-draft, or unassign before assigning the real owner.
+
 ### Worktree Development
+`create-branch` already pushed the `{num}-{slug}` branch on assignment, so check it out rather than creating a new one. Note this repo's base branch is `main`; service repos branch from `origin/dev`.
 ```bash
 cd <repo>
 git fetch origin
-git worktree add ../repo-42 42-feature-slug
+git worktree add ../repo-42 42-feature-slug   # existing branch, no -b
 cd ../repo-42
-# develop, commit, push
+# develop, commit, push → CI runs in the SERVICE repo (none here)
 git push origin 42-feature-slug
 # when done: mark PR ready, get review, merge
 git worktree remove ../repo-42
@@ -57,15 +60,27 @@ git worktree remove ../repo-42
 
 | Path | Purpose |
 |------|---------|
-| `.github/ISSUE_TEMPLATE/` | Org-default issue templates (bug, feature) |
+| `.github/workflows/auto-label.yml` | On issue opened/edited: adds `cross-cutting` if absent (uses default `GITHUB_TOKEN`) |
+| `.github/workflows/issue-router.yml` | On issue opened: 1 repo → recreate in that repo + close here; 2+ → sub-issue per repo |
+| `.github/workflows/create-branch.yml` | On issue assigned: empty branch + draft PR `Closes #N` (skips `cross-cutting`) — see caveat above |
+| `.github/workflows/label-sync.yml` | Mon 06:00 UTC (+ manual): create/update the canonical label set in every org repo |
+| `.github/workflows/project-sync.yml` | Thin caller → `Marketrix-ai/infra/.github/workflows/project-sync-service.yml@dev` (board id `PVT_kwDOCO0iG84An17k`) |
+| `.github/workflows/stale.yml` | Daily 07:00 UTC (+ manual): stale at 60d, close at 90d; exempts `P0`, `cross-cutting`; ignores PRs |
+| `.github/ISSUE_TEMPLATE/` | `bug.yml`, `feature.yml` (repo checkboxes drive `issue-router`), `config.yml` |
 | `.github/PULL_REQUEST_TEMPLATE.md` | Org-default PR template |
-| `.github/workflows/auto-label.yml` | Auto-applies `cross-cutting` label to all `.github` issues |
-| `.github/workflows/issue-router.yml` | Routes issues: 1 repo → moves to that repo; 2+ repos → creates sub-issues |
-| `.github/workflows/create-branch.yml` | Creates feature branch + draft PR on issue assign (skips `cross-cutting`) |
-| `.github/workflows/label-sync.yml` | Syncs label set across all org repos (weekly) |
-| `.github/workflows/project-sync.yml` | Syncs issues to GitHub Project board; PRs move linked issues through statuses |
-| `.github/workflows/stale.yml` | Marks issues stale at 60d, closes at 90d (exempts `P0`, `cross-cutting`) |
-| `profile/README.md` | Org profile displayed on GitHub |
+| `profile/README.md` | Org public profile displayed on GitHub |
+
+> The actual project-board sync logic lives ONCE in infra's reusable `project-sync-service.yml`; every service repo's `project-sync.yml` is a ~15-line caller. Edit board behavior there, not here.
+
+### Project board statuses
+Single org Project (#1, "Marketrix"), `Status` single-select with options **Backlog / Ready / In review / Done** (resolved by name at runtime — renaming/recoloring the option is safe). There is no "In Progress" status.
+
+| Status | Trigger |
+|--------|---------|
+| Backlog | issue opened |
+| Ready | issue assigned; or PR closed unmerged (reverts) |
+| In review | PR opened (also adds `Marketrix-ai/dev` as reviewer) |
+| Done | issue closed; or linked PR merged |
 
 ## Conventions
 
@@ -89,11 +104,11 @@ Current state, constraints, dependencies, key decisions already made.
 Do NOT put implementation details (file paths, function signatures, code) in issues. That's for the developer to figure out in the worktree.
 
 ### Labels
-Synced across all repos by `label-sync.yml`:
+Canonical set created/updated in every org repo by `label-sync.yml` (Mon 06:00 UTC). All scope labels share color `1d76db`:
 - Type: `bug`, `feature`, `enhancement`, `chore`, `documentation`
 - Scope: `cross-cutting`, `api`, `app`, `agent`, `widget`, `infra`, `docs`, `website`, `monitor`
 - Priority: `P0` (critical), `P1` (high), `P2` (normal)
-- Status: `stale` (auto-applied by stale workflow)
+- Status: `stale` (also auto-applied by `stale.yml`)
 
 ### Automation Effects by Label
 | Label | `create-branch` | `stale` |
