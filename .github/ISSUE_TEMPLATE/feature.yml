@@ -1,5 +1,5 @@
 name: Feature Request
-description: Propose a new feature (1 repo = routed there, 2+ = cross-cutting with sub-issues)
+description: Propose a new feature (file in the affected repo; most intake comes from Linear)
 labels: ["feature"]
 body:
   - type: textarea
@@ -18,29 +18,6 @@ body:
         - [ ]
     validations:
       required: true
-  - type: checkboxes
-    id: repos
-    attributes:
-      label: Affected repos
-      description: "1 repo: issue moves there. 2+ repos: stays here as tracking issue, sub-issues auto-created."
-      options:
-        - label: api
-        - label: app
-        - label: agent
-        - label: widget
-        - label: infra
-        - label: docs
-        - label: website
-        - label: monitor
-  - type: textarea
-    id: sub_issues
-    attributes:
-      label: Sub-issues
-      description: Create a sub-issue in each affected repo and link it here.
-      value: |
-        <!-- e.g. Marketrix-ai/api#123 -->
-    validations:
-      required: false
   - type: dropdown
     id: priority
     attributes:

@@ -35,7 +35,7 @@ body:
     id: priority
     attributes:
       label: Priority
-      description: Also apply the matching P0/P1/P2 label. P0 is exempt from stale auto-close.
+      description: Also apply the matching P0/P1/P2 label.
       options:
         - P2 — Normal
         - P1 — High

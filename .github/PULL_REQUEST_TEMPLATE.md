@@ -2,7 +2,7 @@
 <!-- What does this PR do? -->
 
 ## Related issue
-<!-- Use Closes/Fixes/Resolves to link. On open, project-sync moves the linked issue to "In review"; if you omit this it auto-creates a tracking issue and links it back. -->
+<!-- Use Closes/Fixes/Resolves to link the PR to its issue (Linear reads this too). -->
 <!-- Closes # -->
 
 ## Test plan
