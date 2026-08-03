@@ -6,7 +6,7 @@ We build AI agents that learn your product by autonomously using it — navigati
 
 ## What We Do
 
-**QA Automation** — Agents explore your app like real users, running self-healing regression tests that adapt when your UI changes. No brittle selectors, no manual test maintenance.
+**QA Automation** — Agents explore your app like real users, running persona-driven regression flows that adapt when your UI changes. No brittle selectors, no manual test maintenance.
 
 **Customer Profiling & Usage Insights** — Understand how users interact with your product through real behavioral data. Surface usage patterns, identify friction points, and discover growth opportunities.
 
