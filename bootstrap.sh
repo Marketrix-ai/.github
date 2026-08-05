@@ -136,7 +136,7 @@ else
   warn "no 'colima' context - run: colima start --kubernetes --k3s-arg='--disable=metrics-server'"
 fi
 if kubectl config get-contexts -o name 2>/dev/null | grep -qx marketrix-prod-aks; then
-  ok "marketrix-prod-aks - the single cloud cluster (mtx-shared / mtx-dev / mtx-prod)"
+  ok "marketrix-prod-aks - the single cloud cluster (mtx-platform / mtx-dev / mtx-prod)"
 else
   warn "no cloud context - az aks get-credentials, once you have Azure access"
 fi
