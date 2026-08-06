@@ -9,7 +9,8 @@
 # nothing. Run `gh auth login` first.
 #
 # Idempotent — safe to re-run. Existing clones are fetched, never clobbered; no
-# file is overwritten and no secret is ever written.
+# file is overwritten and no secret is ever written. A clone predating the
+# dev -> main default-branch rename is moved onto `main` (commits preserved).
 #
 # What it deliberately does NOT do:
 #   - install anything            : you own your machine; it reports what is missing
@@ -75,16 +76,41 @@ echo
 bold "Workspace  $WORKSPACE"
 mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 
+# The default branch is `main`. A clone made before the rename keeps a local
+# `dev` whose upstream --prune has just deleted, so `git pull` fails there until
+# it is moved. Renaming preserves every commit, so this loses nothing; it bails
+# rather than choose when the answer is ambiguous.
+retarget_main() { # retarget_main <dir>
+  local dir="$1"
+  git -C "$dir" show-ref -q --verify refs/heads/dev || return 0          # nothing to move
+  git -C "$dir" show-ref -q --verify refs/remotes/origin/main || return 0 # upstream not renamed
+  git -C "$dir" show-ref -q --verify refs/remotes/origin/dev && return 0  # both exist: mid-rename
+  if git -C "$dir" show-ref -q --verify refs/heads/main; then
+    warn "$dir has both 'dev' and 'main' - reconcile them yourself, leaving both alone"
+    return 0
+  fi
+  if git -C "$dir" branch -m dev main 2>/dev/null; then
+    git -C "$dir" branch -q --set-upstream-to=origin/main main 2>/dev/null
+    ok "$dir (local 'dev' renamed to 'main')"
+  else
+    warn "$dir - could not rename local 'dev'; run: git branch -m dev main"
+  fi
+}
+
 clone_or_fetch() { # clone_or_fetch <repo> [dir]
   local repo="$1" dir="${2:-$1}"
   if [ -d "$dir/.git" ]; then
     git -C "$dir" fetch origin --prune --quiet 2>/dev/null && ok "$dir (fetched)" || warn "$dir (fetch failed - offline?)"
+    retarget_main "$dir"
   elif gh repo clone "$ORG/$repo" "$dir" -- --quiet 2>/dev/null; then
     ok "$dir (cloned)"
   else
     bad "$dir - clone failed. Private repo: do you have org access?"
     return 1
   fi
+  # origin/HEAD is what makes `git checkout origin/HEAD` and many tools resolve
+  # the default branch; a pre-rename clone still has it pointing at `dev`.
+  git -C "$dir" remote set-head origin -a >/dev/null 2>&1
 }
 
 clone_or_fetch .claude .claude || exit 1
