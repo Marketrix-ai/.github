@@ -154,7 +154,7 @@ cat <<'NEXT'
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
   CLAUDE.md is the source of truth for that repo.
 
-  Never develop on dev directly: branch off origin/dev into a worktree at
+  Never develop on main directly: branch off origin/main into a worktree at
   .work/worktrees/<repo>-<branch> - never inside a repo, never inside .claude/.
 NEXT
 echo
