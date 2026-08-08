@@ -2,7 +2,7 @@
 
 **Agents that learn your product by using it.**
 
-Point Marketrix at a URL. It reads your docs, explores your app in a real browser as AI personas, and folds everything it sees into a living graph of how your product actually works — screens, flows, and behaviour. Everything below runs on that understanding, so you describe what you want in plain language instead of wiring it up.
+Point Marketrix at a URL. It reads your docs, explores your app in a real browser as AI personas, and builds a living graph of how your product works — its screens, journeys, and behaviour. Everything below runs on that understanding, so you describe what you want in plain language instead of wiring it up.
 
 ## For product & research teams
 
@@ -14,9 +14,9 @@ Point Marketrix at a URL. It reads your docs, explores your app in a real browse
 
 ## For engineering teams
 
-**QA Flows** — Turn plain-language requirements into journeys, bind personas to them, and run them in real Chrome across desktop, tablet, and mobile. Every journey returns a passed / failed / indecisive verdict with screenshots and the steps actually taken. No selectors to maintain, and it adapts when your UI moves.
+**QA Flows** — Turn plain-language requirements into journeys, bind personas to them, and run them in real Chrome across desktop, tablet, and mobile. Every journey returns a passed, failed, or indecisive outcome with screenshots and the steps taken. No selectors to maintain, and it adapts when your UI moves.
 
-**Workflows** — Connect GitHub, Slack, Teams, Jira, a timer, or MCP. Wire GitHub, Slack, and timer events into multi-step workflows so Marketrix runs inside the stack you already have.
+**Workflows** — Trigger multi-step workflows from GitHub, Slack, or timer events, then combine GitHub and Slack actions with Marketrix operations.
 
 ## Links
 
