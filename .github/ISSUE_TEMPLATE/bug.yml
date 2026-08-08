@@ -1,12 +1,11 @@
 name: Bug Report
-description: Report a bug (file in the affected repo, not here)
+description: File a bug in the affected repository
 labels: ["bug"]
 body:
   - type: textarea
     id: description
     attributes:
       label: Description
-      description: What happened?
     validations:
       required: true
   - type: textarea

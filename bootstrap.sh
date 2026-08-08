@@ -1,21 +1,4 @@
 #!/usr/bin/env bash
-#
-# Marketrix dev-environment bootstrap.
-#
-#   curl -fsSL https://raw.githubusercontent.com/Marketrix-ai/.github/main/bootstrap.sh | bash
-#
-# The script is public; the platform is not. Every repo it clones except `widget`
-# is private, so without org access this exits at the first clone having changed
-# nothing. Run `gh auth login` first.
-#
-# Idempotent — safe to re-run. Existing clones are fetched, never clobbered; no
-# file is overwritten and no secret is ever written. A clone predating the
-# dev -> main default-branch rename is moved onto `main` (commits preserved).
-#
-# What it deliberately does NOT do:
-#   - install anything            : you own your machine; it reports what is missing
-#   - write ~/.config/marketrix/  : those age keys come from a human, out of band
-#   - start Colima or Tilt        : one `colima start` is a decision, not a side effect
 set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
@@ -30,11 +13,9 @@ bad()  { printf '  \033[31mx\033[0m %s\n' "$*"; }
 
 MISSING=0
 
-# --- 1 . Prerequisites -------------------------------------------------------
-# Reported, never installed. Only an absent binary blocks.
 bold "Prerequisites"
 
-need() { # need <binary> <why> [version-cmd]
+need() {
   if command -v "$1" >/dev/null 2>&1; then
     ok "$1${3:+ - $(eval "$3" 2>/dev/null | head -1)}"
   else
@@ -69,22 +50,16 @@ if [ "$MISSING" -ne 0 ]; then
   exit 1
 fi
 
-# --- 2 . Workspace + clones --------------------------------------------------
-# The workspace root is deliberately NOT a git repo - it holds sibling clones, so
-# nothing can leak between their histories.
 echo
 bold "Workspace  $WORKSPACE"
 mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 
-# The default branch is `main`. A clone made before the rename keeps a local
-# `dev` whose upstream --prune has just deleted, so `git pull` fails there until
-# it is moved. Renaming preserves every commit, so this loses nothing; it bails
-# rather than choose when the answer is ambiguous.
-retarget_main() { # retarget_main <dir>
+# Ambiguous dev/main states stay untouched.
+retarget_main() {
   local dir="$1"
-  git -C "$dir" show-ref -q --verify refs/heads/dev || return 0          # nothing to move
-  git -C "$dir" show-ref -q --verify refs/remotes/origin/main || return 0 # upstream not renamed
-  git -C "$dir" show-ref -q --verify refs/remotes/origin/dev && return 0  # both exist: mid-rename
+  git -C "$dir" show-ref -q --verify refs/heads/dev || return 0
+  git -C "$dir" show-ref -q --verify refs/remotes/origin/main || return 0
+  git -C "$dir" show-ref -q --verify refs/remotes/origin/dev && return 0
   if git -C "$dir" show-ref -q --verify refs/heads/main; then
     warn "$dir has both 'dev' and 'main' - reconcile them yourself, leaving both alone"
     return 0
@@ -97,7 +72,7 @@ retarget_main() { # retarget_main <dir>
   fi
 }
 
-clone_or_fetch() { # clone_or_fetch <repo> [dir]
+clone_or_fetch() {
   local repo="$1" dir="${2:-$1}"
   if [ -d "$dir/.git" ]; then
     git -C "$dir" fetch origin --prune --quiet 2>/dev/null && ok "$dir (fetched)" || warn "$dir (fetch failed - offline?)"
@@ -108,20 +83,15 @@ clone_or_fetch() { # clone_or_fetch <repo> [dir]
     bad "$dir - clone failed. Private repo: do you have org access?"
     return 1
   fi
-  # origin/HEAD is what makes `git checkout origin/HEAD` and many tools resolve
-  # the default branch; a pre-rename clone still has it pointing at `dev`.
   git -C "$dir" remote set-head origin -a >/dev/null 2>&1
 }
 
 clone_or_fetch .claude .claude || exit 1
 for r in "${CODE_REPOS[@]}"; do clone_or_fetch "$r"; done
 
-# --- 3 . Constitution symlinks -----------------------------------------------
-# All three resolve to the same file. `.claude/CLAUDE.md` alone is enough for
-# Claude Code; the root spellings are what every OTHER tool rooted here looks for.
 echo
 bold "Constitution symlinks"
-link() { # link <target> <name>
+link() {
   if [ -e "$2" ] && [ ! -L "$2" ]; then warn "$2 exists and is not a symlink - leaving it alone"; return; fi
   ln -sfn "$1" "$2" && ok "$2 -> $1"
 }
@@ -129,19 +99,14 @@ link .claude           .agents
 link .claude/CLAUDE.md CLAUDE.md
 link .agents/AGENTS.md AGENTS.md
 
-# --- 4 . Scratch dirs --------------------------------------------------------
-# .work/ is never committed and is not a git repo - that is the point: no plan,
-# spec, or scratch checkout can leak into a service repo's history.
 mkdir -p "$WORKSPACE/.work/worktrees" "$WORKSPACE/.work/plans" "$WORKSPACE/.work/specs"
 ok ".work/{worktrees,plans,specs}"
 
-# --- 5 . Secrets - reported, never fetched -----------------------------------
 echo
 bold "Secret keys  $KEY_DIR"
 if [ -d "$KEY_DIR" ]; then
   for f in keys.local.txt keys.dev.txt keys.prod.txt keys.shared.txt; do
     if [ -f "$KEY_DIR/$f" ]; then
-      # 0600 matters - these decrypt production.
       mode=$(stat -f '%Lp' "$KEY_DIR/$f" 2>/dev/null || stat -c '%a' "$KEY_DIR/$f" 2>/dev/null)
       [ "$mode" = "600" ] && ok "$f" || warn "$f is mode $mode, not 0600 - chmod 600 $KEY_DIR/$f"
     else
@@ -153,7 +118,6 @@ else
   warn "Without keys.local.txt the Tiltfile cannot decrypt local secrets."
 fi
 
-# --- 6 . Cluster contexts ----------------------------------------------------
 echo
 bold "Clusters"
 if kubectl config get-contexts -o name 2>/dev/null | grep -qx colima; then
@@ -167,7 +131,6 @@ else
   warn "no cloud context - az aks get-credentials, once you have Azure access"
 fi
 
-# --- 7 . Next steps ----------------------------------------------------------
 echo
 bold "Next"
 cat <<'NEXT'

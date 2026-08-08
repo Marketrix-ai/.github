@@ -1,5 +1,5 @@
 name: Feature Request
-description: Propose a new feature (file in the affected repo; most intake comes from Linear)
+description: File a feature request in the affected repository
 labels: ["feature"]
 body:
   - type: textarea
@@ -13,7 +13,6 @@ body:
     id: acceptance
     attributes:
       label: Acceptance criteria
-      description: Testable conditions that define done.
       value: |
         - [ ]
     validations:
