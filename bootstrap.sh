@@ -105,7 +105,7 @@ ok ".work/{worktrees,plans,specs}"
 echo
 bold "Secret keys  $KEY_DIR"
 if [ -d "$KEY_DIR" ]; then
-  for f in keys.local.txt keys.dev.txt keys.prod.txt keys.shared.txt; do
+  for f in keys.local.txt keys.dev.txt keys.prod.txt keys.platform.txt; do
     if [ -f "$KEY_DIR/$f" ]; then
       mode=$(stat -f '%Lp' "$KEY_DIR/$f" 2>/dev/null || stat -c '%a' "$KEY_DIR/$f" 2>/dev/null)
       [ "$mode" = "600" ] && ok "$f" || warn "$f is mode $mode, not 0600 - chmod 600 $KEY_DIR/$f"
