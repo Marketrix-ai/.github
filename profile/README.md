@@ -6,9 +6,7 @@ Point Marketrix at a URL. It reads your docs, explores your app in a real browse
 
 ## For product & research teams
 
-**User Studies** — Synthetic research in three forms. *UX Research*: personas run neutral tasks and answer your research questions. *Survey*: personas fill your form in character, with a justification behind every answer and conjoint trade-off analysis. *A/B Study*: two variants judged on conversion — personas run both, each is scored on how likely it is to convert, and the variant that converts better across the journeys wins. You also see where friction peaks and who gives up.
-
-**User Interviews** — Send a link to real people. They complete an AI-run interview in voice or text, with no login, and the transcripts land back in your dashboard.
+**User Studies** — Synthetic research in three forms. *UX Research*: personas run neutral tasks and answer your research questions. *Survey*: real people answer your questionnaire through a no-login link while personas fill the same form in character, each with a justification behind every answer and conjoint trade-off analysis — the two stay side by side rather than being merged. *A/B Study*: two variants judged on conversion — personas run both, each is scored on how likely it is to convert, and the variant that converts better across the journeys wins. You also see where friction peaks and who gives up.
 
 **User Support** — An embeddable widget that answers your users in three modes: *tell* them, *show* them on the page, or *do* it for them. Backed by session replay and click, scroll-depth, and attention heatmaps.
 
