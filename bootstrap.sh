@@ -123,7 +123,7 @@ bold "Clusters"
 if kubectl config get-contexts -o name 2>/dev/null | grep -qx colima; then
   ok "colima context present"
 else
-  warn "no 'colima' context - run: colima start --kubernetes --k3s-arg='--disable=metrics-server'"
+  warn "no 'colima' context - run: colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='\"--disable=metrics-server,traefik\"'"
 fi
 if kubectl config get-contexts -o name 2>/dev/null | grep -qx marketrix-prod-aks; then
   ok "marketrix-prod-aks - the single cloud cluster (mtx-platform / mtx-dev / mtx-prod)"
@@ -134,7 +134,7 @@ fi
 echo
 bold "Next"
 cat <<'NEXT'
-  1  colima start --kubernetes --k3s-arg='--disable=metrics-server'
+  1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
      kubectl config use-context colima
   2  cd infra && tilt up          # builds + deploys everything with hot reload;
                                   # local workloads land in mtx-local
