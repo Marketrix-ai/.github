@@ -1,4 +1,14 @@
 #!/usr/bin/env bash
+# Idempotent workspace bootstrap for the Marketrix multi-repo monorepo. Checks local tool
+# prerequisites and gh auth; clones or fetches .claude plus every CODE_REPOS entry into
+# MARKETRIX_HOME (default ~/code/marketrix), renaming a stray local 'dev' branch to 'main' when a
+# repo has migrated but the clone hasn't (retarget_main) and leaving genuinely ambiguous dev/main
+# states untouched rather than guessing; creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
+# constitution symlinks (skipping any that already exist as a real file, never overwriting one);
+# creates .work/{worktrees,plans,specs}; audits SOPS/age key file presence and permissions under
+# ~/.config/marketrix without ever creating or committing them; and checks for the local colima and
+# cloud marketrix-prod-aks kubectl contexts. Safe to re-run any time — every step no-ops cleanly on
+# a workspace that's already set up.
 set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
@@ -54,7 +64,6 @@ echo
 bold "Workspace  $WORKSPACE"
 mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 
-# Ambiguous dev/main states stay untouched.
 retarget_main() {
   local dir="$1"
   git -C "$dir" show-ref -q --verify refs/heads/dev || return 0
@@ -95,9 +104,10 @@ link() {
   if [ -e "$2" ] && [ ! -L "$2" ]; then warn "$2 exists and is not a symlink - leaving it alone"; return; fi
   ln -sfn "$1" "$2" && ok "$2 -> $1"
 }
-link .claude           .agents
-link .claude/CLAUDE.md CLAUDE.md
-link .agents/AGENTS.md AGENTS.md
+link .claude                 .agents
+link .claude/CLAUDE.md       CLAUDE.md
+link .agents/AGENTS.md       AGENTS.md
+link .claude/NOMENCLATURE.md NOMENCLATURE.md
 
 mkdir -p "$WORKSPACE/.work/worktrees" "$WORKSPACE/.work/plans" "$WORKSPACE/.work/specs"
 ok ".work/{worktrees,plans,specs}"
