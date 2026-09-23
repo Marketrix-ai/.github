@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent workspace bootstrap for the Marketrix multi-repo monorepo. Checks local tool
 # prerequisites and gh auth; clones or fetches .claude plus every CODE_REPOS entry into
-# MARKETRIX_HOME (default ~/code/marketrix), renaming a stray local 'dev' branch to 'main' when a
-# repo has migrated but the clone hasn't (retarget_main) and leaving genuinely ambiguous dev/main
-# states untouched rather than guessing; creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
+# MARKETRIX_HOME (default ~/code/marketrix); creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
 # constitution symlinks (skipping any that already exist as a real file, never overwriting one);
 # creates .work/{worktrees,plans,specs}; audits SOPS/age key file presence and permissions under
 # ~/.config/marketrix without ever creating or committing them; and checks for the local colima and
@@ -13,7 +11,7 @@ set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
 ORG="Marketrix-ai"
-CODE_REPOS=(agent api app widget meet personaos docs monitor infra)
+CODE_REPOS=(agent api app widget meet personaos docs monitor infra website)
 KEY_DIR="$HOME/.config/marketrix"
 
 bold() { printf '\033[1m%s\033[0m\n' "$*"; }
@@ -36,8 +34,8 @@ need() {
 
 need git       "everything"                    "git --version"
 need gh        "cloning the private repos"     "gh --version"
-need node      "api, app, widget, meet, personaos, docs, monitor (24+)" "node --version"
-need npm       "same"                          "npm --version"
+need node      "api, app, widget, meet, personaos, docs, monitor, website (24+)" "node --version"
+need bun       "every Node repo's install, gate and release" "bun --version"
 need uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" "uv --version"
 need kubectl   "local + cloud clusters"        "kubectl version --client 2>/dev/null | head -1"
 need colima    "local k3s AND the docker daemon Tilt builds into" "colima version 2>/dev/null | head -1"
@@ -64,28 +62,10 @@ echo
 bold "Workspace  $WORKSPACE"
 mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 
-retarget_main() {
-  local dir="$1"
-  git -C "$dir" show-ref -q --verify refs/heads/dev || return 0
-  git -C "$dir" show-ref -q --verify refs/remotes/origin/main || return 0
-  git -C "$dir" show-ref -q --verify refs/remotes/origin/dev && return 0
-  if git -C "$dir" show-ref -q --verify refs/heads/main; then
-    warn "$dir has both 'dev' and 'main' - reconcile them yourself, leaving both alone"
-    return 0
-  fi
-  if git -C "$dir" branch -m dev main 2>/dev/null; then
-    git -C "$dir" branch -q --set-upstream-to=origin/main main 2>/dev/null
-    ok "$dir (local 'dev' renamed to 'main')"
-  else
-    warn "$dir - could not rename local 'dev'; run: git branch -m dev main"
-  fi
-}
-
 clone_or_fetch() {
   local repo="$1" dir="${2:-$1}"
   if [ -d "$dir/.git" ]; then
     git -C "$dir" fetch origin --prune --quiet 2>/dev/null && ok "$dir (fetched)" || warn "$dir (fetch failed - offline?)"
-    retarget_main "$dir"
   elif gh repo clone "$ORG/$repo" "$dir" -- --quiet 2>/dev/null; then
     ok "$dir (cloned)"
   else
