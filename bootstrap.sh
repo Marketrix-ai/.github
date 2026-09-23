@@ -63,13 +63,13 @@ bold "Workspace  $WORKSPACE"
 mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 
 clone_or_fetch() {
-  local repo="$1" dir="${2:-$1}"
+  local repo="$1" dir="${2:-$1}" err
   if [ -d "$dir/.git" ]; then
-    git -C "$dir" fetch origin --prune --quiet 2>/dev/null && ok "$dir (fetched)" || warn "$dir (fetch failed - offline?)"
-  elif gh repo clone "$ORG/$repo" "$dir" -- --quiet 2>/dev/null; then
+    if err="$(git -C "$dir" fetch origin --prune --quiet 2>&1)"; then ok "$dir (fetched)"; else warn "$dir (fetch failed): $err"; fi
+  elif err="$(gh repo clone "$ORG/$repo" "$dir" -- --quiet 2>&1)"; then
     ok "$dir (cloned)"
   else
-    bad "$dir - clone failed. Private repo: do you have org access?"
+    bad "$dir - clone failed: $err"
     return 1
   fi
   git -C "$dir" remote set-head origin -a >/dev/null 2>&1
@@ -98,7 +98,7 @@ if [ -d "$KEY_DIR" ]; then
   for f in keys.local.txt keys.prod.txt keys.platform.txt; do
     if [ -f "$KEY_DIR/$f" ]; then
       mode=$(stat -f '%Lp' "$KEY_DIR/$f" 2>/dev/null || stat -c '%a' "$KEY_DIR/$f" 2>/dev/null)
-      [ "$mode" = "600" ] && ok "$f" || warn "$f is mode $mode, not 0600 - chmod 600 $KEY_DIR/$f"
+      if [ "$mode" = "600" ]; then ok "$f"; else warn "$f is mode $mode, not 0600 - chmod 600 $KEY_DIR/$f"; fi
     else
       warn "$f absent - ask a maintainer (never commit these)"
     fi
