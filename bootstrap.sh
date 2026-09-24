@@ -134,7 +134,7 @@ cat <<'NEXT'
   CLAUDE.md is the source of truth for that repo.
 
   Never develop on main directly: branch off origin/main into a worktree at
-  .work/worktrees/<repo>-<branch> - never inside a repo, never inside .claude/.
+  .work/worktrees/<repo>-<issue> - never inside a repo, never inside .claude/.
 NEXT
 echo
 ok "Bootstrap complete."
