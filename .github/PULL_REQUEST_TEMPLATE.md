@@ -1,7 +1,8 @@
 ## Summary
 
-## Related issue
-<!-- Closes DEV-<n> -->
+## Plan
+
+Closes DEV-
 
 ## Test plan
 - [ ]

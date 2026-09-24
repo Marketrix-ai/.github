@@ -1,12 +1,8 @@
 #!/usr/bin/env bash
-# Idempotent workspace bootstrap for the Marketrix multi-repo monorepo. Checks local tool
-# prerequisites and gh auth; clones or fetches .claude plus every CODE_REPOS entry into
-# MARKETRIX_HOME (default ~/code/marketrix), adopting a plain directory of that name in place; creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
-# constitution symlinks (skipping any that already exist as a real file, never overwriting one);
-# creates .work/{worktrees,plans,specs}; audits SOPS/age key file presence and permissions under
-# ~/.config/marketrix without ever creating or committing them; and checks for the local colima and
-# cloud marketrix-prod-aks kubectl contexts. Safe to re-run any time — every step no-ops cleanly on
-# a workspace that's already set up.
+# Idempotent workspace bootstrap for the Marketrix multi-repo workspace: checks tool prerequisites and gh
+# auth, clones or fetches .claude plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
+# creates the constitution symlinks and .work/{worktrees,plans,specs}, and audits the SOPS/age key files and
+# kubectl contexts. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
 set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
@@ -24,32 +20,37 @@ MISSING=0
 bold "Prerequisites"
 
 need() {
-  if command -v "$1" >/dev/null 2>&1; then
-    ok "$1${3:+ - $(eval "$3" 2>/dev/null | head -1)}"
+  if command -v "$1" >/dev/null; then
+    ok "$1 - $("$1" "${@:3}" 2>&1 | head -1)"
   else
     bad "$1 missing - $2"
     MISSING=1
   fi
 }
 
-need git       "everything"                    "git --version"
-need gh        "cloning the private repos"     "gh --version"
-need node      "api, app, widget, meet, personaos, docs, monitor, website (24+)" "node --version"
-need bun       "every Node repo's install, gate and release" "bun --version"
-need uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" "uv --version"
-need python3   "infra's gate and deploy scripts" "python3 --version"
-need kubectl   "local + cloud clusters"        "kubectl version --client 2>/dev/null | head -1"
-need colima    "local k3s AND the docker daemon Tilt builds into" "colima version 2>/dev/null | head -1"
-need tilt      "the local stack"               "tilt version"
-need sops      "secret decryption"             "sops --version 2>/dev/null | head -1"
-need age       "the SOPS backend"              "age --version"
-need helm      "infra"                         "helm version --short"
-need terraform "infra"                         "terraform version | head -1"
+optional() {
+  if command -v "$1" >/dev/null; then ok "$1 - $("$1" "${@:3}" 2>&1 | head -1)"; else warn "$1 missing - $2"; fi
+}
 
-if gh auth status >/dev/null 2>&1; then
-  ok "gh authenticated as $(gh api user -q .login 2>/dev/null || echo '?')"
+need git       "everything"                                        --version
+need gh        "cloning the private repos"                         --version
+need bun       "every TS repo's install, gate and release"         --version
+need uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" --version
+need python3   "infra's gate and deploy scripts"                   --version
+need jq        "the release skill and the WorktreeCreate hook"     --version
+need kubectl   "local + cloud clusters"                            version --client
+need colima    "local k3s AND the docker daemon Tilt builds into"  version
+need tilt      "the local stack"                                   version
+need sops      "secret decryption"                                 --version
+need age       "the SOPS backend"                                  --version
+optional helm      "only for infra ops (render, bootstrap-cluster)" version --short
+optional terraform "only for infra ops (terraform/azure)"          version
+optional az        "only for infra ops and releases"               version --query '"azure-cli"' --output tsv
+
+if gh_err="$(gh auth status 2>&1)"; then
+  ok "gh authenticated as $(gh api user -q .login 2>&1)"
 else
-  bad "gh is not authenticated - run: gh auth login"
+  bad "gh is not authenticated - run: gh auth login ($gh_err)"
   MISSING=1
 fi
 
@@ -84,11 +85,12 @@ clone_or_fetch() {
     bad "$dir - clone failed: $err"
     return 1
   fi
-  git -C "$dir" remote set-head origin -a >/dev/null 2>&1
+  if ! err="$(git -C "$dir" remote set-head origin -a 2>&1)"; then warn "$dir (set-head failed): $err"; fi
 }
 
 clone_or_fetch .claude .claude || exit 1
-for r in "${CODE_REPOS[@]}"; do clone_or_fetch "$r"; done
+FAILED=0
+for r in "${CODE_REPOS[@]}"; do clone_or_fetch "$r" || FAILED=$((FAILED + 1)); done
 
 echo
 bold "Constitution symlinks"
@@ -109,7 +111,7 @@ bold "Secret keys  $KEY_DIR"
 if [ -d "$KEY_DIR" ]; then
   for f in keys.local.txt keys.prod.txt keys.platform.txt; do
     if [ -f "$KEY_DIR/$f" ]; then
-      mode=$(stat -f '%Lp' "$KEY_DIR/$f" 2>/dev/null || stat -c '%a' "$KEY_DIR/$f" 2>/dev/null)
+      if [ "$(uname)" = Darwin ]; then mode=$(stat -f '%Lp' "$KEY_DIR/$f"); else mode=$(stat -c '%a' "$KEY_DIR/$f"); fi
       if [ "$mode" = "600" ]; then ok "$f"; else warn "$f is mode $mode, not 0600 - chmod 600 $KEY_DIR/$f"; fi
     else
       warn "$f absent - ask a maintainer (never commit these)"
@@ -122,12 +124,13 @@ fi
 
 echo
 bold "Clusters"
-if kubectl config get-contexts -o name 2>/dev/null | grep -qx colima; then
+contexts="$(kubectl config get-contexts -o name 2>&1)" || warn "kubectl config get-contexts failed: $contexts"
+if grep -qx colima <<<"$contexts"; then
   ok "colima context present"
 else
   warn "no 'colima' context - run: colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='\"--disable=metrics-server,traefik\"'"
 fi
-if kubectl config get-contexts -o name 2>/dev/null | grep -qx marketrix-prod-aks; then
+if grep -qx marketrix-prod-aks <<<"$contexts"; then
   ok "marketrix-prod-aks - the single cloud cluster (mtx-platform / mtx-prod)"
 else
   warn "no cloud context - az aks get-credentials, once you have Azure access"
@@ -138,9 +141,8 @@ bold "Next"
 cat <<'NEXT'
   1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
      kubectl config use-context colima
-  2  cd infra && tilt up          # builds + deploys everything with hot reload;
-                                  # local workloads land in mtx-local
-  3  http://app.marketrix.localhost   (api :8080/:8081 . monitor :9004 . meet :9005)
+  2  cd infra && tilt up    (builds and deploys everything into mtx-local with hot reload)
+  3  http://<svc>.marketrix.localhost, e.g. app.marketrix.localhost, api.marketrix.localhost
 
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
   CLAUDE.md is the source of truth for that repo.
@@ -149,4 +151,8 @@ cat <<'NEXT'
   .work/worktrees/<repo>-<issue> - never inside a repo, never inside .claude/.
 NEXT
 echo
+if [ "$FAILED" -ne 0 ]; then
+  bad "Bootstrap incomplete: $FAILED repo(s) failed to sync - see above."
+  exit 1
+fi
 ok "Bootstrap complete."
