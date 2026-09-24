@@ -67,7 +67,7 @@ mkdir -p "$WORKSPACE" && cd "$WORKSPACE" || exit 1
 clone_or_fetch() {
   local repo="$1" dir="${2:-$1}" err
   if [ -d "$dir/.git" ]; then
-    if err="$(git -C "$dir" fetch origin --prune --quiet 2>&1)"; then ok "$dir (fetched)"; else warn "$dir (fetch failed): $err"; fi
+    if err="$(git -C "$dir" fetch origin --prune --quiet 2>&1)"; then ok "$dir (fetched)"; else bad "$dir - fetch failed: $err"; return 1; fi
   elif [ -d "$dir" ]; then
     local tmp; tmp="$(mktemp -d)"
     if err="$(gh repo clone "$ORG/$repo" "$tmp/r" -- --quiet --no-checkout 2>&1 && mv "$tmp/r/.git" "$dir/.git" \
@@ -88,8 +88,8 @@ clone_or_fetch() {
   if ! err="$(git -C "$dir" remote set-head origin -a 2>&1)"; then warn "$dir (set-head failed): $err"; fi
 }
 
-clone_or_fetch .claude .claude || exit 1
 FAILED=0
+clone_or_fetch .claude .claude || { [ -d .claude/.git ] || exit 1; FAILED=1; }
 for r in "${CODE_REPOS[@]}"; do clone_or_fetch "$r" || FAILED=$((FAILED + 1)); done
 
 echo
