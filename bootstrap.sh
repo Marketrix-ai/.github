@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent workspace bootstrap for the Marketrix multi-repo monorepo. Checks local tool
 # prerequisites and gh auth; clones or fetches .claude plus every CODE_REPOS entry into
-# MARKETRIX_HOME (default ~/code/marketrix); creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
+# MARKETRIX_HOME (default ~/code/marketrix), adopting a plain directory of that name in place; creates the .agents/AGENTS.md/CLAUDE.md/NOMENCLATURE.md
 # constitution symlinks (skipping any that already exist as a real file, never overwriting one);
 # creates .work/{worktrees,plans,specs}; audits SOPS/age key file presence and permissions under
 # ~/.config/marketrix without ever creating or committing them; and checks for the local colima and
@@ -37,6 +37,7 @@ need gh        "cloning the private repos"     "gh --version"
 need node      "api, app, widget, meet, personaos, docs, monitor, website (24+)" "node --version"
 need bun       "every Node repo's install, gate and release" "bun --version"
 need uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" "uv --version"
+need python3   "infra's gate and deploy scripts" "python3 --version"
 need kubectl   "local + cloud clusters"        "kubectl version --client 2>/dev/null | head -1"
 need colima    "local k3s AND the docker daemon Tilt builds into" "colima version 2>/dev/null | head -1"
 need tilt      "the local stack"               "tilt version"
@@ -66,6 +67,17 @@ clone_or_fetch() {
   local repo="$1" dir="${2:-$1}" err
   if [ -d "$dir/.git" ]; then
     if err="$(git -C "$dir" fetch origin --prune --quiet 2>&1)"; then ok "$dir (fetched)"; else warn "$dir (fetch failed): $err"; fi
+  elif [ -d "$dir" ]; then
+    local tmp; tmp="$(mktemp -d)"
+    if err="$(gh repo clone "$ORG/$repo" "$tmp/r" -- --quiet --no-checkout 2>&1 && mv "$tmp/r/.git" "$dir/.git" \
+      && git -C "$dir" reset -q 2>&1 && git -C "$dir" ls-files -dz | xargs -0 git -C "$dir" checkout -- 2>&1)"; then
+      ok "$dir (repaired: adopted the plain directory as a checkout, local files kept)"
+    else
+      bad "$dir - repair failed: $err"
+      rm -rf "$tmp"
+      return 1
+    fi
+    rm -rf "$tmp"
   elif err="$(gh repo clone "$ORG/$repo" "$dir" -- --quiet 2>&1)"; then
     ok "$dir (cloned)"
   else
