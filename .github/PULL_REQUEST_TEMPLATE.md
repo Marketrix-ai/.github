@@ -1,7 +1,7 @@
 ## Summary
 
 ## Related issue
-<!-- Closes # -->
+<!-- Closes DEV-<n> -->
 
 ## Test plan
 - [ ]
