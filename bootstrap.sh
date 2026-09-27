@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Idempotent workspace bootstrap for the Marketrix multi-repo workspace: checks tool prerequisites and gh
-# auth, clones or fetches .claude plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
+# auth, clones or fetches .claude (fast-forwarding a clean main) plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
 # creates the constitution symlinks and .work/{worktrees,plans,specs}, and audits the SOPS/age key files and
 # kubectl contexts. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
 set -uo pipefail
@@ -89,6 +89,10 @@ clone_or_fetch() {
 
 FAILED=0
 clone_or_fetch .claude .claude || { [ -d .claude/.git ] || exit 1; FAILED=1; }
+if [ -n "$(git -C .claude status --porcelain)" ] || [ "$(git -C .claude branch --show-current)" != main ]; then
+  warn ".claude is not a clean main - the constitution may be stale; pull it yourself"
+elif err="$(git -C .claude merge --ff-only --quiet origin/main 2>&1)"; then ok ".claude fast-forwarded to origin/main"
+else warn ".claude fast-forward failed: $err"; fi
 for r in "${CODE_REPOS[@]}"; do clone_or_fetch "$r" || FAILED=$((FAILED + 1)); done
 
 echo
@@ -127,7 +131,7 @@ contexts="$(kubectl config get-contexts -o name 2>&1)" || warn "kubectl config g
 if grep -qx colima <<<"$contexts"; then
   ok "colima context present"
 else
-  warn "no 'colima' context - run: colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='\"--disable=metrics-server,traefik\"'"
+  warn "no 'colima' context - start it with step 1 under Next"
 fi
 if grep -qx marketrix-prod-aks <<<"$contexts"; then
   ok "marketrix-prod-aks - the single cloud cluster (mtx-platform / mtx-prod)"
