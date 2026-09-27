@@ -19,33 +19,32 @@ MISSING=0
 
 bold "Prerequisites"
 
-need() {
+check() {
+  local required="$1"; shift
   if command -v "$1" >/dev/null; then
     ok "$1 - $("$1" "${@:3}" 2>&1 | head -1)"
-  else
+  elif [ "$required" = 1 ]; then
     bad "$1 missing - $2"
     MISSING=1
+  else
+    warn "$1 missing - $2"
   fi
 }
 
-optional() {
-  if command -v "$1" >/dev/null; then ok "$1 - $("$1" "${@:3}" 2>&1 | head -1)"; else warn "$1 missing - $2"; fi
-}
-
-need git       "everything"                                        --version
-need gh        "cloning the private repos"                         --version
-need bun       "every TS repo's install, gate and release"         --version
-need uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" --version
-need python3   "infra's gate and deploy scripts"                   --version
-need jq        "the release skill and the WorktreeCreate hook"     --version
-need kubectl   "local + cloud clusters"                            version --client
-need colima    "local k3s AND the docker daemon Tilt builds into"  version
-need tilt      "the local stack"                                   version
-need sops      "secret decryption"                                 --version
-need age       "the SOPS backend"                                  --version
-optional helm      "only for infra ops (render, bootstrap-cluster)" version --short
-optional terraform "only for infra ops (terraform/azure)"          version
-optional az        "only for infra ops and releases"               version --query '"azure-cli"' --output tsv
+check 1 git       "everything"                                        --version
+check 1 gh        "cloning the private repos"                         --version
+check 1 bun       "every TS repo's install, gate and release"         --version
+check 1 uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" --version
+check 1 python3   "infra's gate and deploy scripts"                   --version
+check 1 jq        "the release skill and the WorktreeCreate hook"     --version
+check 1 kubectl   "local + cloud clusters"                            version --client
+check 1 colima    "local k3s AND the docker daemon Tilt builds into"  version
+check 1 tilt      "the local stack"                                   version
+check 1 sops      "secret decryption"                                 --version
+check 1 age       "the SOPS backend"                                  --version
+check 0 helm      "only for infra ops (render, bootstrap-cluster)"    version --short
+check 0 terraform "only for infra ops (terraform/azure)"             version
+check 0 az        "only for infra ops and releases"                  version --query '"azure-cli"' --output tsv
 
 if gh_err="$(gh auth status 2>&1)"; then
   ok "gh authenticated as $(gh api user -q .login 2>&1)"
