@@ -36,7 +36,7 @@ check 1 gh        "cloning the private repos"                         --version
 check 1 bun       "every TS repo's install, gate and release"         --version
 check 1 uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" --version
 check 1 python3   "infra's gate and deploy scripts"                   --version
-check 1 jq        "the release skill and the WorktreeCreate hook"     --version
+check 1 jq        "the WorktreeCreate hook"                          --version
 check 1 kubectl   "local + cloud clusters"                            version --client
 check 1 colima    "local k3s AND the docker daemon Tilt builds into"  version
 check 1 tilt      "the local stack"                                   version
