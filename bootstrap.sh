@@ -2,7 +2,8 @@
 # Idempotent workspace bootstrap for the Marketrix multi-repo workspace: checks tool prerequisites and gh
 # auth, clones or fetches .claude (fast-forwarding a clean main) plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
 # creates the constitution symlinks and .work/{worktrees,plans,specs}, and audits the SOPS/age key files and
-# kubectl contexts. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
+# kubectl contexts. On macOS it writes /etc/resolver/marketrix.test (sudo, once) so *.marketrix.test reaches Tilt's
+# user-level dnsmasq. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
 set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
@@ -126,6 +127,19 @@ else
   warn "Without keys.local.txt the Tiltfile cannot decrypt local secrets."
 fi
 
+if [ "$(uname)" = Darwin ]; then
+  echo
+  bold "Local DNS  /etc/resolver/marketrix.test"
+  resolver=$'nameserver 127.0.0.1\nport 5354'
+  if [ "$(cat /etc/resolver/marketrix.test 2>/dev/null)" = "$resolver" ]; then
+    ok "already points *.marketrix.test at 127.0.0.1:5354"
+  elif sudo mkdir -p /etc/resolver && printf 'nameserver 127.0.0.1\nport 5354\n' | sudo tee /etc/resolver/marketrix.test >/dev/null; then
+    ok "written - *.marketrix.test resolves via 127.0.0.1:5354"
+  else
+    warn "could not write /etc/resolver/marketrix.test - *.marketrix.test will not resolve until it exists"
+  fi
+fi
+
 echo
 bold "Clusters"
 contexts="$(kubectl config get-contexts -o name 2>&1)" || warn "kubectl config get-contexts failed: $contexts"
@@ -145,9 +159,9 @@ bold "Next"
 cat <<'NEXT'
   1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
      kubectl config use-context colima
-  2  cd infra && tilt up    (builds and deploys everything into mtx-local with hot reload)
-  3  cd infra && bash scripts/setup-local-machine.sh    (once; needs dnsmasq: resolves *.marketrix.test and trusts the local CA)
-  4  https://<svc>.marketrix.test, e.g. app.marketrix.test, api.marketrix.test
+  2  cd infra && tilt up    (builds and deploys everything into mtx-local with hot reload; its local-machine
+     step starts a user-level dnsmasq and trusts the local CA)
+  3  open https://app.marketrix.test    (every service is at https://<svc>.marketrix.test)
 
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
   CLAUDE.md is the source of truth for that repo.
