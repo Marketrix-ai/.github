@@ -145,7 +145,8 @@ cat <<'NEXT'
   1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
      kubectl config use-context colima
   2  cd infra && tilt up    (builds and deploys everything into mtx-local with hot reload)
-  3  http://<svc>.marketrix.localhost, e.g. app.marketrix.localhost, api.marketrix.localhost
+  3  cd infra && bash scripts/setup-local-machine.sh    (once: adds the hosts and trusts the local CA)
+  4  https://<svc>.marketrix.test, e.g. app.marketrix.test, api.marketrix.test
 
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
   CLAUDE.md is the source of truth for that repo.
