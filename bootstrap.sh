@@ -3,7 +3,7 @@
 # auth, clones or fetches .claude (fast-forwarding a clean main) plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
 # creates the constitution symlinks and .work/{worktrees,plans,specs}, and audits the SOPS/age key files and
 # kubectl contexts. On macOS it writes /etc/resolver/marketrix.test (sudo, once) so *.marketrix.test reaches Tilt's
-# user-level dnsmasq. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
+# user-level CoreDNS. It installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
 set -uo pipefail
 
 WORKSPACE="${MARKETRIX_HOME:-$HOME/code/marketrix}"
@@ -41,7 +41,7 @@ check 1 jq        "the WorktreeCreate hook"                          --version
 check 1 kubectl   "local + cloud clusters"                            version --client
 check 1 colima    "local k3s AND the docker daemon Tilt builds into"  version
 check 1 tilt      "the local stack"                                   version
-check 1 dnsmasq   "resolving *.marketrix.test for the local stack"    --version
+check 1 coredns   "resolving *.marketrix.test for the local stack"    -version
 check 1 sops      "secret decryption"                                 --version
 check 1 age       "the SOPS backend"                                  --version
 check 0 helm      "only for infra ops (render, bootstrap-cluster)"    version --short
@@ -130,11 +130,10 @@ fi
 if [ "$(uname)" = Darwin ]; then
   echo
   bold "Local DNS  /etc/resolver/marketrix.test"
-  resolver=$'nameserver 127.0.0.1\nport 5354'
-  if [ "$(cat /etc/resolver/marketrix.test 2>/dev/null)" = "$resolver" ]; then
-    ok "already points *.marketrix.test at 127.0.0.1:5354"
-  elif sudo mkdir -p /etc/resolver && printf 'nameserver 127.0.0.1\nport 5354\n' | sudo tee /etc/resolver/marketrix.test >/dev/null; then
-    ok "written - *.marketrix.test resolves via 127.0.0.1:5354"
+  if [ "$(cat /etc/resolver/marketrix.test 2>/dev/null)" = 'nameserver 127.0.0.1' ]; then
+    ok "already points *.marketrix.test at 127.0.0.1"
+  elif sudo mkdir -p /etc/resolver && echo 'nameserver 127.0.0.1' | sudo tee /etc/resolver/marketrix.test >/dev/null; then
+    ok "written - *.marketrix.test resolves via 127.0.0.1"
   else
     warn "could not write /etc/resolver/marketrix.test - *.marketrix.test will not resolve until it exists"
   fi
@@ -160,7 +159,7 @@ cat <<'NEXT'
   1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
      kubectl config use-context colima
   2  cd infra && tilt up    (builds and deploys everything into mtx-local with hot reload; its local-machine
-     step starts a user-level dnsmasq and trusts the local CA)
+     step starts a user-level CoreDNS and trusts the local CA)
   3  open https://app.marketrix.test    (every service is at https://<svc>.marketrix.test)
 
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
