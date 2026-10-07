@@ -143,7 +143,8 @@ fi
 echo
 bold "Next"
 cat <<'NEXT'
-  1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --k3s-arg='"--disable=metrics-server,traefik"'
+  1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --kubernetes-version v1.36.5+k3s1 \
+       --k3s-arg='"--disable=metrics-server,traefik"'    (AKS's minor; tilt refuses any other)
      kubectl config use-context colima
   2  cd infra && tilt up    (builds and deploys everything into mtx-local, rebuilding on change)
   3  open http://app.marketrix.localhost    (every service is at http://<svc>.marketrix.localhost)
