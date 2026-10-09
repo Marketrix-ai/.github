@@ -43,7 +43,7 @@ check 1 colima    "local k3s AND the docker daemon Tilt builds into"  version
 check 1 tilt      "the local stack"                                   version
 check 1 sops      "secret decryption"                                 --version
 check 1 age       "the SOPS backend"                                  --version
-check 0 helm      "only for infra ops (render, bootstrap-cluster)"    version --short
+check 1 helm      "the chart renderer Tilt runs"                      version --short
 check 0 terraform "only for infra ops (terraform/azure)"             version
 check 0 az        "only for infra ops and releases"                  version --query '"azure-cli"' --output tsv
 
@@ -146,7 +146,7 @@ cat <<'NEXT'
   1  colima start --cpus 8 --memory 24 --disk 100 --kubernetes --kubernetes-version v1.36.5+k3s1 \
        --k3s-arg='"--disable=metrics-server,traefik"'    (AKS's minor; tilt refuses any other)
      kubectl config use-context colima
-  2  cd infra && tilt up    (builds and deploys everything into mtx-local, rebuilding on change)
+  2  cd infra && tilt up    (deploys everything into mtx-local; services hot reload as you edit)
   3  open http://app.marketrix.localhost    (every service is at http://<svc>.marketrix.localhost)
 
   Read .claude/CLAUDE.md first - it is the constitution. Each repo's own
