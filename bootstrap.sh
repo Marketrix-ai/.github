@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Idempotent workspace bootstrap for the Marketrix multi-repo workspace: checks tool prerequisites and gh
 # auth, clones or fetches .claude (fast-forwarding a clean main) plus every CODE_REPOS entry into MARKETRIX_HOME (default ~/code/marketrix),
-# creates the constitution symlinks and .work/{worktrees,plans,specs}, and audits the SOPS/age key files and
+# creates the constitution symlinks and .work/{plans,specs}, and audits the SOPS/age key files and
 # kubectl contexts. The local stack needs no host setup: every OS resolves *.marketrix.localhost to loopback. It
 # installs nothing and never writes a secret; it exits 1 if any repo failed to sync.
 set -uo pipefail
@@ -37,7 +37,6 @@ check 1 gh        "cloning the private repos"                         --version
 check 1 bun       "every TS repo's install, gate and release"         --version
 check 1 uv        "agent (Python 3.14+) - https://docs.astral.sh/uv/" --version
 check 1 python3   "infra's gate and deploy scripts"                   --version
-check 1 jq        "the WorktreeCreate hook"                          --version
 check 1 kubectl   "local + cloud clusters"                            version --client
 check 1 colima    "local k3s AND the docker daemon Tilt builds into"  version
 check 1 tilt      "the local stack"                                   version
@@ -107,8 +106,8 @@ link .claude/CLAUDE.md       CLAUDE.md
 link .agents/AGENTS.md       AGENTS.md
 link .claude/NOMENCLATURE.md NOMENCLATURE.md
 
-mkdir -p "$WORKSPACE/.work/worktrees" "$WORKSPACE/.work/plans" "$WORKSPACE/.work/specs"
-ok ".work/{worktrees,plans,specs}"
+mkdir -p "$WORKSPACE/.work/plans" "$WORKSPACE/.work/specs"
+ok ".work/{plans,specs}"
 
 echo
 bold "Secret keys  $KEY_DIR"
@@ -153,7 +152,7 @@ cat <<'NEXT'
   CLAUDE.md is the source of truth for that repo.
 
   Never develop on main directly: branch off origin/main into a worktree at
-  .work/worktrees/<repo>-<issue> - never inside a repo, never inside .claude/.
+  <repo>/.claude/worktrees/<issue>, Claude Code's default.
 NEXT
 echo
 if [ "$FAILED" -ne 0 ]; then
